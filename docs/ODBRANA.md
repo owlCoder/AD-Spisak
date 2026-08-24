@@ -26,7 +26,19 @@ Ako komisija pita da li je svaki domen poseban proces, odgovoriti precizno:
 
 To je bolji odgovor nego nazvati svaki folder mikroservisom ako se trenutno ne izvršava kao zaseban proces.
 
-## 3. Demo aplikacije — 3 do 4 minuta
+## 3. Brza provera servisa — 20 sekundi
+
+Pre nego što počne demonstracija proveriti health endpoint-e:
+
+```bash
+API_URL=https://<api-host> \
+XLSX_API_URL=https://<xlsx-host> \
+npm run smoke
+```
+
+Očekivani rezultat su dve `✓` poruke. Ako jedan servis ne odgovara, odmah preći na fallback demonstraciju umesto da se vreme troši na dijagnostiku pred komisijom.
+
+## 4. Demo aplikacije — 3 do 4 minuta
 
 Pre odbrane pripremiti jedan predmet sa nekoliko testnih studenata i podacima.
 
@@ -58,7 +70,7 @@ Ako je demo stanje pripremljeno, pokazati projektni zadatak i termin odbrane. Ne
 
 Na kraju pokazati izvoz. Ovo je dobar trenutak da se objasni zašto je Excel obrada izdvojena u zaseban servis.
 
-## 4. Kod koji treba pokazati — 2 minuta
+## 5. Kod koji treba pokazati — 2 minuta
 
 Ne otvarati nasumične fajlove. Pokazati najviše četiri mesta.
 
@@ -88,7 +100,7 @@ Poenta:
 
 > „Frontend komponente ne sadrže razbacane URL-ove i HTTP detalje; komunikacija je izdvojena u API sloj klijenta.“
 
-## 5. Rezultati — 60 sekundi
+## 6. Rezultati — 60 sekundi
 
 Otvoriti `docs/MEASUREMENTS.md`.
 
@@ -104,7 +116,7 @@ Završna rečenica:
 
 > „Bitno mi je bilo da poboljšanje ne ostane samo arhitektonska tvrdnja, već da ga proverim funkcionalnim testovima i konkretnim merenjima.“
 
-## 6. Očekivana pitanja
+## 7. Očekivana pitanja
 
 ### Zašto MySQL, a ne NoSQL?
 
@@ -142,7 +154,7 @@ U kontrolisanim uslovima sa istim funkcionalnim opterećenjem, kroz više merenj
 - fizički izdvojio domene samo ako monitoring pokaže da im je potrebno nezavisno skaliranje;
 - dodao formalni API ugovor/OpenAPI specifikaciju.
 
-## 7. Fallback ako demo ne radi
+## 8. Fallback ako demo ne radi
 
 Pre odbrane napraviti screenshot ili kratak video sledećih ekrana:
 
@@ -155,8 +167,9 @@ Pre odbrane napraviti screenshot ili kratak video sledećih ekrana:
 
 Ako cloud ili baza nisu dostupni, ne pokušavati nekoliko minuta da se servis „oživi“. Odmah preći na screenshot/video, zatim pokazati kod i rezultate merenja.
 
-## 8. Checklista neposredno pre odbrane
+## 9. Checklista neposredno pre odbrane
 
+- [ ] `npm run smoke` prolazi za oba serverska paketa;
 - [ ] testni korisnik radi;
 - [ ] testni predmet ima podatke;
 - [ ] API URL u frontend okruženju je ispravan;
