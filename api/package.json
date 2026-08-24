@@ -1,7 +1,7 @@
 {
   "name": "evidencija-api",
   "version": "1.0.9",
-  "description": "",
+  "description": "Glavni REST API za SaaS evidenciju i evaluaciju uspeha studenata",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -11,7 +11,7 @@
     "vercel-build": "echo hey"
   },
   "keywords": [],
-  "author": "",
+  "author": "Danijel Jovanović",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
