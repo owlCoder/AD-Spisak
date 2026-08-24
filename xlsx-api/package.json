@@ -1,7 +1,7 @@
 {
   "name": "evidencija-xlsx-api",
   "version": "1.0.9",
-  "description": "",
+  "description": "Izdvojeni servis za Excel izvoz podataka iz sistema evidencije studenata",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -11,7 +11,7 @@
     "vercel-build": "echo hey"
   },
   "keywords": [],
-  "author": "",
+  "author": "Danijel Jovanović",
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
