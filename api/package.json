@@ -1,12 +1,13 @@
 {
   "name": "evidencija-api",
   "version": "1.0.9",
-  "description": "Glavni REST API za SaaS evidenciju i evaluaciju uspeha studenata",
+  "description": "Domain API runtime for AD-Spisak microservices",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
     "start": "node index.js",
+    "serve": "ts-node ./api/index.ts",
     "dev": "nodemon --exec ts-node ./api/index.ts",
     "vercel-build": "echo hey"
   },

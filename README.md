@@ -1,155 +1,133 @@
-# AD-Spisak
+# AD-Spisak — microservices Docker verzija
 
 SaaS aplikacija za **evidenciju i evaluaciju uspeha studenata**, razvijena u okviru master rada *„Metodologije i prakse u razvoju SaaS rešenja za evidenciju i evaluaciju uspeha studenata“*.
 
-Repozitorijum je organizovan kao monorepo kako bi kompletno rešenje bilo pregledno na jednom mestu i jednostavno za pokretanje tokom demonstracije.
+Ova grana je pripremljena za odbranu rada: funkcionalne celine glavnog API-ja pokreću se kao **zasebni procesi/kontejneri**, ispred njih se nalazi API gateway, a kompletno lokalno okruženje se podiže jednom Docker Compose komandom.
 
-## Pregled sistema
+## Arhitektura
 
 ```mermaid
 flowchart LR
     U[Profesor / student] --> W[web\nReact + TypeScript]
-    W --> A[api\nExpress + TypeScript]
-    W --> X[xlsx-api\nExcel servis]
-    A --> D[(MySQL)]
-    X --> A
+    W --> G[API gateway\nNginx]
+
+    G --> A[auth-service]
+    G --> K[users-service]
+    G --> S[subjects-service]
+    G --> E[attendance-service]
+    G --> P[points-service]
+    G --> PR[projects-service]
+    G --> T[defenses-service]
+    G --> X[xlsx-service]
+
+    A --> DB[(MySQL)]
+    K --> DB
+    S --> DB
+    E --> DB
+    P --> DB
+    PR --> DB
+    T --> DB
+    X --> G
 ```
 
-### Delovi repozitorijuma
+Glavni domeni koriste isti TypeScript codebase, ali svaki kontejner dobija sopstveni `SERVICE_NAME` i registruje **isključivo svoje rute**. Time su servisi fizički odvojene runtime jedinice, mogu da se pokreću, zaustavljaju i skaliraju nezavisno. Excel izvoz je poseban servis sa sopstvenim paketom.
 
-| Folder | Uloga | Tehnologije |
-|---|---|---|
-| [`web/`](web/) | Klijentska aplikacija | React, Vite, TypeScript, Tailwind CSS |
-| [`api/`](api/) | Glavni REST API i poslovna logika | Express, TypeScript, MySQL, JWT |
-| [`xlsx-api/`](xlsx-api/) | Izdvojeni servis za Excel izvoz | Express, TypeScript, ExcelJS |
-| [`docs/`](docs/) | Arhitektura, rezultati merenja i plan demonstracije | Markdown |
+> Za lokalnu odbrambenu verziju servisi dele jednu MySQL instancu kako bi demo bio determinističan i jednostavan za resetovanje. To ne menja činjenicu da su aplikativni servisi zasebni procesi; database-per-service je mogući naredni korak, ali nije uslov za mikroservisni deployment.
 
-> **Napomena o arhitekturi:** javni monorepo je konsolidovan radi jednostavnijeg pregleda i demonstracije. U okviru `api/` domeni su odvojeni kroz kontrolere, servise, repozitorijume i modele, dok je Excel obrada izdvojena u poseban servis. Ovakva organizacija zadržava jasne granice odgovornosti bez nepotrebnog dupliranja zajedničkog koda u repozitorijumu.
+Detalji: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) i [`docs/DOCKER-MICROSERVICES.md`](docs/DOCKER-MICROSERVICES.md).
 
-## Funkcionalne celine
+## Brzi start za odbranu
 
-Aplikacija pokriva ključne tokove nastavnog procesa:
-
-- autentifikaciju korisnika i kontrolu pristupa;
-- upravljanje korisnicima i studentima;
-- upravljanje predmetima;
-- evidenciju prisustva;
-- evidenciju poena i predispitnih obaveza;
-- projektne zadatke;
-- termine odbrane;
-- pregled rezultata studenta;
-- uvoz/izvoz podataka kroz Excel.
-
-## Organizacija API sloja
-
-Glavni API je podeljen po domenima. Svaka oblast ima zaseban ulazni sloj i poslovnu logiku, npr. autentifikacija, korisnici, predmeti, projekti, odbrane, prisustvo i poeni. Ulazna tačka aplikacije povezuje te domene u REST API, dok pristup bazi ostaje izdvojen od HTTP sloja.
-
-Detaljniji prikaz je u [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-## Pokretanje
-
-### 1. Kloniranje
+Potrebni su samo **Docker Desktop** i Docker Compose.
 
 ```bash
-git clone https://github.com/owlCoder/AD-Spisak.git
-cd AD-Spisak
+git checkout odbrana-microservices-docker
+docker compose up --build
 ```
 
-### 2. Konfiguracija okruženja
+Kada su servisi `healthy`, otvoriti:
 
-Kopirati `.env.example` u `.env` unutar svakog paketa i popuniti vrednosti.
+- aplikacija: http://localhost:5173
+- API gateway: http://localhost:8080/api/health
 
-**`api/.env`**
+### Demo nalog nastavnika
 
-```env
-DB_HOST=
-DB_PORT=
-DB_USER=
-DB_PASSWORD=
-DB_NAME=
-DB_SSL_MODE=
-JWT_SECRET=
+- predmet: `Demo predmet - AD Spisak`
+- email: `nastavnik@demo.local`
+- lozinka: `Odbrana2026!`
+
+Studenti koriste `student1@demo.local`, `student2@demo.local` i `student3@demo.local` sa istom demo lozinkom.
+
+Demo kredencijali su namerno javni i važe **isključivo za lokalnu Docker bazu**.
+
+## Servisi i portovi
+
+| Servis | Uloga | Host port |
+|---|---|---:|
+| `web` | React klijent | 5173 |
+| `gateway` | jedinstvena ulazna tačka | 8080 |
+| `auth-service` | prijava i JWT | 3101 |
+| `users-service` | korisnici + Excel import | 3102 |
+| `subjects-service` | predmeti | 3103 |
+| `attendance-service` | prisustvo | 3104 |
+| `points-service` | poeni + agregirani export podaci | 3105 |
+| `projects-service` | projektni zadaci | 3106 |
+| `defenses-service` | termini odbrane | 3107 |
+| `xlsx-service` | generisanje Excel datoteka | 3108 |
+| `mysql` | lokalna demo baza | 3307 |
+
+Direktna provera jednog servisa, na primer:
+
+```bash
+curl http://localhost:3105/api/health
 ```
 
-**`web/.env`**
+## Korisne Docker komande
 
-```env
-VITE_NAZIV_VERZIJA=
-VITE_API_URL=
-VITE_API_URL_EXCEL=
+```bash
+npm run docker:up       # build + start
+npm run docker:ps       # pregled kontejnera
+npm run docker:logs     # objedinjeni logovi
+npm run docker:down     # zaustavljanje
+npm run docker:reset    # briše i bazu; sledeći start ponovo seed-uje demo podatke
 ```
 
-**`xlsx-api/.env`**
+Za tihu pripremu pred odbranu:
 
-```env
-API_URL=
-JWT_SECRET=
+```bash
+docker compose up -d --build
+docker compose ps
 ```
 
-Tajne i realni pristupni podaci nisu deo repozitorijuma.
+## Bez Dockera
 
-### 3. Instalacija zavisnosti
-
-Iz korena repozitorijuma:
+Originalni način pokretanja paketa ostaje dostupan:
 
 ```bash
 npm run install:all
-```
-
-ili pojedinačno:
-
-```bash
-npm install --prefix api
-npm install --prefix xlsx-api
-npm install --prefix web
-```
-
-### 4. Razvojno pokretanje
-
-U tri terminala:
-
-```bash
 npm run dev:api
 npm run dev:xlsx
 npm run dev:web
 ```
 
-### 5. Provera build-a
-
-```bash
-npm run build
-```
+Ako se glavni API pokrene bez `SERVICE_NAME`, ponaša se kao ranije i registruje sve rute (`SERVICE_NAME=all`).
 
 ## Rezultati evaluacije
 
-Tokom evaluacije opisane u master radu zabeleženi su sledeći rezultati:
+U master radu su dokumentovani sledeći rezultati:
 
-- **318 testova** u sedam test skupova;
-- **100% uspešnih testova**, bez neuspešnih slučajeva;
-- izdvojeni test slučajevi: **36–80 ms**;
-- prosečna vremena odziva posmatranih domena: **43–76 ms**;
-- propusnost pod opterećenjem stabilizovana na približno **590–610 zahteva/s**;
-- u poređenju arhitektura, izmerena upotreba resursa za modularizovano rešenje bila je **12–55%**, naspram približno **70%** u početnom monolitnom scenariju.
+- **318 testova**, 0 neuspešnih;
+- izdvojeni test slučajevi **36–80 ms**;
+- prosečna vremena odziva **43–76 ms**;
+- stabilizacija propusnosti na približno **590–610 zahteva/s**;
+- izmerena upotreba resursa **12–55%** u odnosu na približno **70%** u početnom monolitnom scenariju.
 
-Metodologija i kontekst ovih merenja dokumentovani su u [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
+Kontekst merenja: [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
 
 ## Materijal za odbranu
 
-Za brzu demonstraciju i pregled ključnih tačaka koristiti [`docs/ODBRANA.md`](docs/ODBRANA.md).
-
-Dokument sadrži:
-
-- redosled demonstracije;
-- koje delove koda pokazati komisiji;
-- kratke odgovore na očekivana pitanja;
-- rezervni plan ako cloud servis nije dostupan tokom odbrane.
-
-## Deployment
-
-Frontend i serverski paketi sadrže Vercel konfiguraciju. Deployment može da se vodi odvojeno po paketu, uz promenljive okruženja definisane na platformi.
+Praktičan redosled demonstracije i odgovori na očekivana pitanja nalaze se u [`docs/ODBRANA.md`](docs/ODBRANA.md).
 
 ## Autor
 
 **Danijel Jovanović** — [`@owlCoder`](https://github.com/owlCoder)
-
-Ovaj repozitorijum predstavlja autorsku implementaciju razvijenu za potrebe master rada.

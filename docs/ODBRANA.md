@@ -1,181 +1,164 @@
-# Plan demonstracije za odbranu
+# Plan demonstracije za odbranu — mikroservisna Docker verzija
 
-Ovaj dokument je praktičan podsetnik za demonstraciju repozitorijuma i aplikacije. Cilj je da se za nekoliko minuta pokažu problem, arhitektonska odluka, ključne funkcionalnosti i merljivi rezultati.
+## Pre ulaska komisije
 
-## 1. Uvod — 30 sekundi
-
-Otvoriti root `README.md` i reći:
-
-> „Ovo je monorepo praktičnog dela master rada. Rešenje ima React klijent, glavni TypeScript/Express API sa domenima odvojenim po odgovornosti i poseban servis za Excel operacije. Sistem je namenjen evidenciji prisustva, poena, projekata i termina odbrane.“
-
-Ne ulaziti odmah u detalje implementacije.
-
-## 2. Arhitektura — 60 sekundi
-
-Otvoriti `docs/ARCHITECTURE.md` i pokazati dijagram.
-
-Naglasiti tri stvari:
-
-1. klijent ne pristupa bazi direktno;
-2. HTTP sloj, poslovna logika i pristup podacima su razdvojeni;
-3. funkcionalne celine imaju jasne granice odgovornosti.
-
-Ako komisija pita da li je svaki domen poseban proces, odgovoriti precizno:
-
-> „U ovom javnom snapshot-u glavni API je konsolidovan u jedan Express deployment radi jednostavnije demonstracije, ali su domeni logički odvojeni na kontrolere, servise i data-access sloj. Excel servis je fizički izdvojen. Fizičko izdvajanje ostalih domena je mogući sledeći korak kada profil opterećenja to opravda.“
-
-To je bolji odgovor nego nazvati svaki folder mikroservisom ako se trenutno ne izvršava kao zaseban proces.
-
-## 3. Brza provera servisa — 20 sekundi
-
-Pre nego što počne demonstracija proveriti health endpoint-e:
+Pokrenuti:
 
 ```bash
-API_URL=https://<api-host> \
-XLSX_API_URL=https://<xlsx-host> \
-npm run smoke
+git checkout odbrana-microservices-docker
+docker compose up -d --build
+docker compose ps
 ```
 
-Očekivani rezultat su dve `✓` poruke. Ako jedan servis ne odgovara, odmah preći na fallback demonstraciju umesto da se vreme troši na dijagnostiku pred komisijom.
+Otvoriti unapred:
+
+1. `http://localhost:5173`
+2. `http://localhost:8080/api/health`
+3. root `README.md`
+4. `docs/ARCHITECTURE.md`
+5. `docs/MEASUREMENTS.md`
+
+Demo nalog: `nastavnik@demo.local` / `Odbrana2026!`.
+
+## 1. Uvod — oko 30 sekundi
+
+Reći:
+
+> „Ovo je praktični deo master rada. Za odbranu je sistem pokrenut potpuno lokalno u Dockeru. Klijent komunicira sa API gateway-em, a autentifikacija, korisnici, predmeti, prisustvo, poeni, projekti i termini odbrane izvršavaju se kao zasebni kontejneri. Excel obrada je dodatni izdvojeni servis.“
+
+## 2. Dokaži da su mikroservisi stvarno odvojeni — oko 60 sekundi
+
+Pokazati `docker compose ps`.
+
+Naglasiti:
+
+- svaki domen je zaseban Node.js proces/kontejner;
+- svaki ima sopstveni health endpoint;
+- gateway usmerava zahtev na odgovarajući servis;
+- klijent ne zna interne adrese servisa.
+
+Ako pitaju kako isti repo može da bude mikroservisni:
+
+> „Mikroservis ne mora da bude poseban Git repozitorijum. Bitna je runtime i deployment granica. Ovde isti TypeScript codebase koristim kao osnovu, ali svaka instanca dobija `SERVICE_NAME`, registruje samo svoj domen i radi kao zaseban proces. Time mogu nezavisno da restartujem ili skaliram pojedinačni servis.“
+
+## 3. Dijagram — oko 60 sekundi
+
+Otvoriti `docs/ARCHITECTURE.md`.
+
+Tok zahteva:
+
+`React -> Nginx gateway -> odgovarajući mikroservis -> MySQL`.
+
+Za Excel:
+
+`React -> gateway -> xlsx-service -> gateway -> potrebni domen-servisi`.
 
 ## 4. Demo aplikacije — 3 do 4 minuta
 
-Pre odbrane pripremiti jedan predmet sa nekoliko testnih studenata i podacima.
+### Prijava
 
-### Tok A — prijava
+1. izabrati `Demo predmet - AD Spisak`;
+2. prijaviti se kao `nastavnik@demo.local`;
+3. objasniti da zahtev kroz gateway ide u `auth-service`.
 
-1. otvoriti početnu stranicu;
-2. prijaviti se kao nastavno osoblje;
-3. objasniti da token identifikuje korisnika i predmet.
-
-### Tok B — studenti i evidencija
+### Studenti
 
 1. otvoriti listu studenata;
-2. izabrati jednog studenta;
-3. prikazati ili promeniti evidenciju prisustva;
-4. pokazati da se promena vraća kroz API i čuva u bazi.
+2. objasniti da `/api/studenti` gateway šalje u `users-service`;
+3. otvoriti jednog studenta.
 
-### Tok C — poeni
+### Prisustvo
 
-1. otvoriti profil studenta;
-2. uneti/izmeniti poene;
-3. osvežiti prikaz;
-4. pokazati da je vrednost trajno sačuvana.
+1. prikazati evidenciju;
+2. po potrebi promeniti jednu vrednost;
+3. naglasiti da taj domen obrađuje `attendance-service`.
 
-### Tok D — projekat i odbrana
+### Poeni
 
-Ako je demo stanje pripremljeno, pokazati projektni zadatak i termin odbrane. Ne trošiti vreme na unos velikog broja podataka tokom same odbrane.
+1. prikazati/izmeniti poene;
+2. osvežiti stranicu;
+3. naglasiti `points-service`.
 
-### Tok E — Excel
+### Projekat i termin odbrane
 
-Na kraju pokazati izvoz. Ovo je dobar trenutak da se objasni zašto je Excel obrada izdvojena u zaseban servis.
+Pokazati postojeće demo podatke bez ručnog kreiranja velikog broja zapisa.
 
-## 5. Kod koji treba pokazati — 2 minuta
+### Excel
 
-Ne otvarati nasumične fajlove. Pokazati najviše četiri mesta.
+Ako vreme dozvoli, pokazati izvoz i objasniti da ga obrađuje poseban `xlsx-service`.
+
+## 5. Kod koji pokazati — najviše 2 minuta
 
 ### `api/api/index.ts`
 
-Pokazuje domenske rute i ulaznu tačku serverskog dela.
-
 Poenta:
 
-> „Ulazna tačka ne sadrži poslovnu logiku; ona samo registruje odvojene domenske kontrolere.“
+> „Ista aplikativna osnova može da se pokrene kao jedan servis zbog kompatibilnosti ili kao odvojeni domen-servisi. `SERVICE_NAME` određuje koje rute konkretan proces poseduje.“
 
-### Jedan kontroler, npr. `api/controllers/poeni_controller.ts`
+### `docker-compose.yml`
 
-Poenta:
+Pokazati da se API image podiže sedam puta sa vrednostima `auth`, `users`, `subjects`, `attendance`, `points`, `projects` i `defenses`.
 
-> „Kontroler obrađuje HTTP zahtev, ali konkretan rad delegira servisu.“
+### `docker/gateway/nginx.conf`
 
-### Odgovarajući servis
+Pokazati npr. da `/api/poeni/*` ide na `points-service`, a `/api/evidencija/*` na `attendance-service`.
 
-Poenta:
+To je jači dokaz mikroservisne verzije od pokazivanja velikog broja nasumičnih klasa.
 
-> „Poslovna logika nije vezana za React niti za HTTP rutu, što je važno za održavanje i testiranje.“
+## 6. Rezultati — oko 60 sekundi
 
-### `web/src/api/`
-
-Poenta:
-
-> „Frontend komponente ne sadrže razbacane URL-ove i HTTP detalje; komunikacija je izdvojena u API sloj klijenta.“
-
-## 6. Rezultati — 60 sekundi
-
-Otvoriti `docs/MEASUREMENTS.md`.
-
-Reći samo ključne brojke:
+Otvoriti `docs/MEASUREMENTS.md` i navesti:
 
 - 318 testova, 0 neuspešnih;
 - 36–80 ms za izdvojene test slučajeve;
 - prosečna vremena odziva 43–76 ms;
-- stabilizacija oko 590–610 zahteva/s pod opterećenjem;
-- upotreba resursa u merenju 12–55% naspram približno 70% kod početnog scenarija.
+- propusnost oko 590–610 zahteva/s nakon stabilizacije;
+- izmerena upotreba resursa 12–55% naspram približno 70% kod početnog monolitnog scenarija.
 
-Završna rečenica:
+Rečenica:
 
-> „Bitno mi je bilo da poboljšanje ne ostane samo arhitektonska tvrdnja, već da ga proverim funkcionalnim testovima i konkretnim merenjima.“
+> „Cilj nije bio samo da kod izgleda modularnije, već da arhitektonske izmene budu proverene funkcionalnim testovima i konkretnim merenjima.“
 
 ## 7. Očekivana pitanja
 
-### Zašto MySQL, a ne NoSQL?
+### Da li je ovo stvarno mikroservisna arhitektura ako servisi dele source code?
 
-Podaci imaju jasne relacije i integritet je važniji od fleksibilne šeme. Student, predmet, poeni, prisustvo, projekat i termin odbrane prirodno formiraju relacioni model.
+Da. Repo granica i mikroservis granica nisu isto. U ovoj grani domeni su zasebne deployment/runtime jedinice, imaju sopstvene procese i mrežne adrese i gateway ih poziva nezavisno.
 
-### Zašto TypeScript?
+### Zašto dele jednu MySQL bazu?
 
-Statička tipizacija smanjuje deo grešaka pri razvoju, olakšava refaktorisanje i čini ugovore između slojeva jasnijim.
+Za lokalnu verziju pred odbranu zadržana je postojeća perzistencija kako se ne bi istovremeno menjala i servisna i data arhitektura. Shared database je kompromis, ne zabrana mikroservisne arhitekture. Sledeći korak bi bio jasnije vlasništvo nad podacima kroz posebne šeme/baze ili data servis.
 
-### Zašto React?
+### Zar database-per-service nije standardna praksa?
 
-Komponentni model dobro odgovara interfejsu koji ima više ponovljivih prikaza i formi, dok API sloj ostaje odvojen od UI komponenti.
+Česta je praksa jer povećava autonomiju servisa, ali nije formalni uslov. Ona uvodi i problem distribuirane konzistentnosti, pa se bira prema konkretnom sistemu, a ne automatski.
 
-### Zašto nije korišćen Moodle?
+### Zašto gateway?
 
-Cilj nije razvoj opšte LMS platforme. Rešenje je specijalizovano za evidenciju predispitnih obaveza, prisustva, poena, projekata i odbrana, pa izbegava funkcionalnosti koje nisu potrebne konkretnom nastavnom toku.
+Da klijent ima jednu ulaznu tačku, da se routing i fizičke adrese mikroservisa ne razlivaju kroz frontend i da se kasnije centralizuju cross-cutting mehanizmi.
 
-### Zašto mikroservisi/modularizacija?
+### Zašto isti API image za više servisa?
 
-Ne zato što su „moderniji“, već zato što funkcionalne celine imaju različite odgovornosti i potencijalno različite profile opterećenja. Važno je naglasiti da mikroservisi nisu automatski bolji izbor za svaki sistem.
+Smanjuje dupliranje build konfiguracije i zajedničkog koda. Svaki kontejner i dalje učitava samo rute svog domena. Kasnije je moguće izdvojiti source pakete bez promene spoljnog API ugovora.
 
-### Zašto javni repo ima jedan glavni API?
+### Kako dokazati nezavisnost?
 
-Monorepo je konsolidovan radi preglednosti i lakše demonstracije. Logičke granice domena su sačuvane, a fizičko razdvajanje treba uvoditi tamo gde donosi opravdanu korist. Excel servis je primer stvarno izdvojene deployment jedinice.
+`docker compose stop points-service` obara samo funkcionalnost poena; ostali servisni kontejneri nastavljaju da rade. Posle toga `docker compose start points-service` vraća domen.
 
-### Kako su dobijene performanse?
+### Zašto MySQL?
 
-U kontrolisanim uslovima sa istim funkcionalnim opterećenjem, kroz više merenja vremena odziva, propusnosti i upotrebe resursa. Brojke predstavljaju konkretno testirano rešenje, ne univerzalno pravilo.
+Domen je prirodno relacioni: studenti, predmeti, poeni, prisustvo, projekti i termini imaju jasne veze, a integritet podataka je važan.
 
 ### Šta bi sledeće unapredio?
 
-- automatizovao arhiviranje starijih podataka;
-- dodao naprednije analitičke izveštaje;
-- proširio automatizovane testove u javnom repozitorijumu;
-- fizički izdvojio domene samo ako monitoring pokaže da im je potrebno nezavisno skaliranje;
-- dodao formalni API ugovor/OpenAPI specifikaciju.
+- automatizovane integracione/contract testove između gateway-a i servisa;
+- OpenAPI ugovore;
+- database ownership po domenu;
+- observability: centralizovane logove, metrike i tracing;
+- orkestraciju i horizontalno skaliranje u cloud okruženju kada opterećenje to opravda.
 
-## 8. Fallback ako demo ne radi
+## 8. Fallback
 
-Pre odbrane napraviti screenshot ili kratak video sledećih ekrana:
+Ova grana je napravljena upravo da odbrana ne zavisi od cloud-a. Ako nema interneta, lokalni Docker demo i dalje radi nakon što su slike/zavisnosti prethodno izgrađene.
 
-1. prijava;
-2. lista studenata;
-3. profil studenta sa poenima;
-4. evidencija prisustva;
-5. projektni zadaci/termini odbrane;
-6. Excel izvoz.
-
-Ako cloud ili baza nisu dostupni, ne pokušavati nekoliko minuta da se servis „oživi“. Odmah preći na screenshot/video, zatim pokazati kod i rezultate merenja.
-
-## 9. Checklista neposredno pre odbrane
-
-- [ ] `npm run smoke` prolazi za oba serverska paketa;
-- [ ] testni korisnik radi;
-- [ ] testni predmet ima podatke;
-- [ ] API URL u frontend okruženju je ispravan;
-- [ ] Excel servis odgovara;
-- [ ] otvoreni su README, `ARCHITECTURE.md` i `MEASUREMENTS.md`;
-- [ ] browser nema otvorene privatne/admin tabove;
-- [ ] u terminalu nema prikazanih tajni iz `.env` fajla;
-- [ ] pripremljen je fallback screenshot/video;
-- [ ] GitHub je otvoren na grani/commit-u koji se demonstrira.
+Dan ranije obavezno jednom pokrenuti `docker compose up --build`, kako bi sve potrebne Docker slike i npm paketi već bili u lokalnom cache-u.

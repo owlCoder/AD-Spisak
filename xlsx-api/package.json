@@ -1,12 +1,13 @@
 {
   "name": "evidencija-xlsx-api",
   "version": "1.0.9",
-  "description": "Izdvojeni servis za Excel izvoz podataka iz sistema evidencije studenata",
+  "description": "Excel export microservice for AD-Spisak",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
     "start": "node index.js",
+    "serve": "ts-node ./api/index.ts",
     "dev": "nodemon --exec ts-node ./api/index.ts",
     "vercel-build": "echo hey"
   },

@@ -1,121 +1,102 @@
-# Arhitektura sistema
+# Arhitektura — microservices Docker verzija
 
-Ovaj dokument daje kratak tehnički pregled rešenja koje prati master rad *„Metodologije i prakse u razvoju SaaS rešenja za evidenciju i evaluaciju uspeha studenata“*.
+## Cilj ove grane
 
-## Kontekst
+Grana `odbrana-microservices-docker` fizički razdvaja funkcionalne domene glavnog API-ja u zasebne runtime jedinice. Isti TypeScript izvorni kod se koristi kao zajednička osnova, ali svaki kontejner dobija `SERVICE_NAME` i registruje samo rute koje pripadaju njegovom domenu.
 
-Cilj sistema je da objedini najčešće aktivnosti vezane za evidenciju i evaluaciju rada studenata: korisnike, predmete, prisustvo, poene, projektne zadatke, termine odbrane i izvoz podataka.
+To omogućava da se servisi nezavisno pokreću, gase, restartuju i skaliraju, bez dupliranja gotovo identične infrastrukture i pomoćnog koda u repozitorijumu.
 
-Javni repozitorijum je organizovan kao monorepo radi lakšeg pregleda i demonstracije. Time se ne menjaju granice odgovornosti u kodu: glavni API je podeljen po domenima, a Excel obrada je izdvojena u poseban servis.
-
-## Pregled komponenti
+## Runtime dijagram
 
 ```mermaid
 flowchart TB
-    subgraph Client[Klijentski sloj]
-        WEB[web\nReact + Vite + TypeScript]
-    end
+    Browser --> Web[React/Vite web]
+    Web --> Gateway[Nginx API gateway]
 
-    subgraph Backend[Serverski sloj]
-        API[api\nExpress + TypeScript]
-        XLSX[xlsx-api\nExpress + ExcelJS]
-    end
+    Gateway --> Auth[auth-service]
+    Gateway --> Users[users-service]
+    Gateway --> Subjects[subjects-service]
+    Gateway --> Attendance[attendance-service]
+    Gateway --> Points[points-service]
+    Gateway --> Projects[projects-service]
+    Gateway --> Defenses[defenses-service]
+    Gateway --> Xlsx[xlsx-service]
 
-    DB[(MySQL)]
+    Auth --> DB[(MySQL)]
+    Users --> DB
+    Subjects --> DB
+    Attendance --> DB
+    Points --> DB
+    Projects --> DB
+    Defenses --> DB
 
-    WEB -->|REST / JSON| API
-    WEB -->|Excel operacije| XLSX
-    XLSX -->|REST| API
-    API --> DB
+    Xlsx --> Gateway
 ```
 
-## Glavni API
+## Granice servisa
 
-Ulazna tačka je `api/api/index.ts`. Ona registruje domenske rute, dok su HTTP obrada i poslovna logika izdvojene iz jednog centralnog fajla.
+| Servis | Rute/domen |
+|---|---|
+| `auth-service` | `/api/auth/*` |
+| `users-service` | `/api/korisnik/*`, `/api/studenti`, `/api/xlsx/convert` |
+| `subjects-service` | `/api/predmet/*`, `/api/predmeti` |
+| `attendance-service` | `/api/evidencija/*` |
+| `points-service` | `/api/poeni/*`, `/api/export` |
+| `projects-service` | `/api/projektni-zadatak/*`, `/api/projektni-zadaci` |
+| `defenses-service` | `/api/termin/*`, `/api/termini` |
+| `xlsx-service` | `/api/xlsx/export`, `/api/xlsx/projects/export` |
 
-Domenske celine uključuju:
+Gateway je jedina adresa koju klijent mora da poznaje. Frontend zato koristi `http://localhost:8080/api`, dok gateway na osnovu URL-a prosleđuje zahtev odgovarajućem servisu.
 
-| Domen | Kontroler | Odgovornost |
-|---|---|---|
-| Autentifikacija | `auth_controller.ts` | Prijava i izdavanje JWT tokena |
-| Korisnici | `korisnik_controller.ts` | Studenti i nastavno osoblje |
-| Predmeti | `predmet_controller.ts` | Upravljanje predmetima |
-| Prisustvo | `evidencija_kontroler.ts` | Evidencija prisustva |
-| Poeni | `poeni_controller.ts` | Predispitne obaveze i poeni |
-| Projekti | `projektni_zadatak_controller.ts` | Projektni zadaci |
-| Odbrane | `odbrane_projekta_controller.ts` | Termini odbrane |
-| Uvoz/izvoz | `excel_controller.ts`, `student_poeni_controller.ts` | Razmena podataka |
+## Kako je od jednog API-ja dobijeno više mikroservisa
 
-Kontroleri delegiraju rad servisima, čime se HTTP sloj odvaja od poslovne logike. Dalje razdvajanje na modele, interfejse i repozitorijume smanjuje direktne zavisnosti i olakšava izmene pojedinačnih celina.
+Ulazna tačka `api/api/index.ts` više ne mora da registruje sve kontrolere. Vrednost `SERVICE_NAME` određuje koji domen se aktivira:
 
-## Tok zahteva
+- `auth`
+- `users`
+- `subjects`
+- `attendance`
+- `points`
+- `projects`
+- `defenses`
+- `all` — kompatibilni režim u kome se ponaša kao originalni objedinjeni API.
 
-Tipičan zahtev prolazi sledećim putem:
+Docker Compose pokreće istu API sliku sedam puta sa različitim `SERVICE_NAME` vrednostima. Svaka instanca je poseban Node.js proces, ima sopstveni health endpoint i može nezavisno da se restartuje ili skalira.
 
-```text
-React komponenta
-    ↓
-web/src/api/*
-    ↓ HTTP
-Express kontroler
-    ↓
-servis
-    ↓
-repozitorijum / data-access sloj
-    ↓
-MySQL
+Primer:
+
+```bash
+docker compose stop points-service
+docker compose start points-service
 ```
 
-Za zaštićene operacije JWT middleware proverava identitet pre ulaska u poslovnu logiku.
+Ostali domeni nastavljaju da rade dok je servis za poene zaustavljen.
 
-## Klijentska aplikacija
+## API gateway
 
-`web/` je React aplikacija sa odvojenim stranicama za prijavu, glavni pregled i profil studenta. Komunikacija sa serverskim delom je izdvojena u `web/src/api/`, tako da komponente ne sadrže direktne detalje HTTP poziva.
+Nginx gateway rešava dve stvari:
 
-Ovakva organizacija omogućava da se promena URL-a, autentifikacionog zaglavlja ili strukture poziva obavi na jednom mestu.
+1. frontend ima jednu stabilnu API adresu;
+2. fizička lokacija servisa nije deo klijentskog koda.
 
-## Excel servis
-
-`xlsx-api/` je izdvojen od glavnog API-ja jer obrada i generisanje Excel dokumenata predstavljaju specifičnu odgovornost sa posebnom bibliotekom i različitim profilom opterećenja.
-
-Time glavni API ne mora da sadrži sve detalje vezane za formatiranje dokumenata.
+Time se izbegava da React aplikacija mora da zna port svakog mikroservisa.
 
 ## Baza podataka
 
-Za domenski model korišćena je relaciona MySQL baza. Izbor odgovara podacima koji imaju jasno definisane veze: student–predmet, student–prisustvo, student–poeni, student–projekat i projekat–termin odbrane.
+Docker varijanta koristi jednu MySQL instancu sa postojećom šemom po predmetu (`korisnici_1`, `poeni_1`, `evidencija_1`, ...). To je svesna odluka za lokalni demo: cilj je da se pokaže fizička dekompozicija aplikativnih servisa bez rizičnog redizajna perzistencije neposredno pred odbranu.
 
-Konfiguracija baze se prosleđuje isključivo kroz promenljive okruženja. Pristupni podaci nisu deo repozitorijuma.
+Mikroservisna arhitektura ne zahteva obavezno database-per-service, ali dugoročno bi vlasništvo nad podacima trebalo dodatno formalizovati. Mogući naredni koraci su zasebne šeme/baze po domenu ili poseban data servis, uz rešavanje konzistentnosti između domena.
 
-## Deployment
+## Excel servis
 
-Paketi imaju Vercel konfiguraciju i mogu da se postavljaju kao odvojeni projekti:
+`xlsx-service` je odvojen paket i proces. Za podatke potrebne za izvoz poziva API gateway, a gateway zatim prosleđuje čitanja servisima za poene i evidenciju. Time Excel servis ne mora direktno da pristupa MySQL bazi.
 
-- `web/` — klijentska aplikacija;
-- `api/` — glavni API;
-- `xlsx-api/` — servis za Excel operacije.
+## Docker mreža
 
-Ovaj javni snapshot koristi konsolidovani glavni Express API kako bi demonstracija i lokalno pokretanje bili jednostavniji. Domeni su i dalje jasno odvojeni u kodu, što omogućava kasnije fizičko izdvajanje onih delova kojima je potrebno nezavisno skaliranje.
+Servisi komuniciraju preko interne Compose mreže koristeći DNS imena (`auth-service`, `points-service`, `gateway`, `mysql`). Samo portovi namenjeni demonstraciji mapirani su na host.
 
-## Veza sa principima iz rada
+## Skaliranje
 
-### Single Responsibility
+Za demonstraciju se može pokazati nezavisno skaliranje servisa koji nema fiksni host port. Pošto su host portovi 3101–3108 dodati radi lakše provere na odbrani, za pravo horizontalno skaliranje ti portovi bi se uklonili i gateway bi koristio više replika iza load balancera.
 
-Kontroleri, servisi i repozitorijumi imaju različite uloge. HTTP obrada nije isto što i poslovna logika, a poslovna logika nije isto što i pristup bazi.
-
-### Dependency separation
-
-Frontend zavisi od API ugovora, a ne od implementacije baze. Servisni sloj odvaja kontrolere od detalja trajnog čuvanja.
-
-### Modularnost
-
-Funkcionalne celine su grupisane po domenima. Izmena evidencije prisustva ne zahteva menjanje logike projektnih zadataka ili termina odbrane.
-
-### Skaliranje po odgovornosti
-
-Izdvojeni Excel servis je konkretan primer komponente koja može da se postavlja i skalira nezavisno od klijenta i glavnog API-ja.
-
-## Ograničenja trenutnog javnog snapshot-a
-
-Repozitorijum je namenjen preglednoj demonstraciji sistema i ne treba ga predstavljati kao situaciju u kojoj je svaki domenski kontroler zaseban proces. Glavni `api/` paket je jedan Express deployment sa jasno odvojenim domenima, dok je `xlsx-api/` fizički izdvojen servis.
-
-Ovo je važna razlika između **logičke modularizacije** i **fizičkog deployment-a** i treba je jasno objasniti ako se pitanje pojavi na odbrani.
+Ključna poenta za odbranu: **granica mikroservisa je runtime/deployment granica, ne samo folder u kodu**. U ovoj grani svaki domen zaista radi kao zaseban proces/kontejner.

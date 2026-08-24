@@ -1,0 +1,8 @@
+node_modules
+*.log
+.env
+.env.*
+.git
+.gitignore
+index.js
+index.js.map

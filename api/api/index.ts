@@ -12,33 +12,66 @@ import termini_routes from "../controllers/odbrane_projekta_controller";
 import excel_routes from "../controllers/excel_controller";
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = Number(process.env.PORT || 3000);
+const serviceName = (process.env.SERVICE_NAME || "all").toLowerCase();
 
-// Apply CORS middleware with options
 app.use(cors());
-app.options('*', cors());
+app.options("*", cors());
+app.use(bodyParser.json({ limit: "10mb" }));
 
-// Middleware to parse JSON bodies
-app.use(bodyParser.json());
-
-// Lightweight endpoint used during deployment checks and the defense demo.
 app.get("/api/health", (_req, res) => {
-  res.status(200).json({ status: "ok", service: "evidencija-api" });
+  res.status(200).json({ status: "ok", service: serviceName });
 });
 
-// Use routes
-app.use("/api", korisnik_routes);
-app.use("/api", auth_routes);
-app.use("/api", evidencija_routes);
-app.use("/api", poeni_routes);
-app.use("/api", export_route);
-app.use("/api", predmeti_routes);
-app.use("/api", projekti_routes);
-app.use("/api", termini_routes);
-app.use("/api", excel_routes);
+const registerAllRoutes = (): void => {
+  app.use("/api", korisnik_routes);
+  app.use("/api", auth_routes);
+  app.use("/api", evidencija_routes);
+  app.use("/api", poeni_routes);
+  app.use("/api", export_route);
+  app.use("/api", predmeti_routes);
+  app.use("/api", projekti_routes);
+  app.use("/api", termini_routes);
+  app.use("/api", excel_routes);
+};
 
-// For Vercel, we need to export the Express app
+switch (serviceName) {
+  case "auth":
+    app.use("/api", auth_routes);
+    break;
+  case "users":
+    app.use("/api", korisnik_routes);
+    app.use("/api", excel_routes);
+    break;
+  case "subjects":
+    app.use("/api", predmeti_routes);
+    break;
+  case "attendance":
+    app.use("/api", evidencija_routes);
+    break;
+  case "points":
+    app.use("/api", poeni_routes);
+    app.use("/api", export_route);
+    break;
+  case "projects":
+    app.use("/api", projekti_routes);
+    break;
+  case "defenses":
+    app.use("/api", termini_routes);
+    break;
+  case "all":
+    registerAllRoutes();
+    break;
+  default:
+    throw new Error(`Unknown SERVICE_NAME: ${serviceName}`);
+}
+
+app.use((_req, res) => {
+  res.status(404).json({ error: "Route not available in this service", service: serviceName });
+});
+
 module.exports = app;
 
-// Start the server
-app.listen(port, () => {});
+app.listen(port, "0.0.0.0", () => {
+  console.log(`[${serviceName}] listening on port ${port}`);
+});

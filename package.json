@@ -13,7 +13,12 @@
     "build:web": "npm --prefix web run build",
     "build": "npm run build:api && npm run build:xlsx && npm run build:web",
     "lint:web": "npm --prefix web run lint",
-    "smoke": "node scripts/smoke-check.mjs"
+    "smoke": "node scripts/smoke-check.mjs",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v",
+    "docker:ps": "docker compose ps",
+    "docker:logs": "docker compose logs -f --tail=100"
   },
   "author": "Danijel Jovanović",
   "license": "MIT"
