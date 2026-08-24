@@ -21,6 +21,11 @@ app.options('*', cors());
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
 
+// Lightweight endpoint used during deployment checks and the defense demo.
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({ status: "ok", service: "evidencija-api" });
+});
+
 // Use routes
 app.use("/api", korisnik_routes);
 app.use("/api", auth_routes);

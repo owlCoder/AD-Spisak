@@ -2,6 +2,8 @@
   "name": "adspisak",
   "private": true,
   "version": "5.0",
+  "description": "React klijent za SaaS evidenciju i evaluaciju uspeha studenata",
+  "author": "Danijel Jovanović",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

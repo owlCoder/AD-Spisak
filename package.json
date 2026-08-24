@@ -1,0 +1,20 @@
+{
+  "name": "ad-spisak-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SaaS aplikacija za evidenciju i evaluaciju uspeha studenata",
+  "scripts": {
+    "install:all": "npm install --prefix api && npm install --prefix xlsx-api && npm install --prefix web",
+    "dev:api": "npm --prefix api run dev",
+    "dev:xlsx": "npm --prefix xlsx-api run dev",
+    "dev:web": "npm --prefix web run dev",
+    "build:api": "npm --prefix api run build",
+    "build:xlsx": "npm --prefix xlsx-api run build",
+    "build:web": "npm --prefix web run build",
+    "build": "npm run build:api && npm run build:xlsx && npm run build:web",
+    "lint:web": "npm --prefix web run lint",
+    "smoke": "node scripts/smoke-check.mjs"
+  },
+  "author": "Danijel Jovanović",
+  "license": "MIT"
+}
