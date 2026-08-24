@@ -12,7 +12,8 @@
     "build:xlsx": "npm --prefix xlsx-api run build",
     "build:web": "npm --prefix web run build",
     "build": "npm run build:api && npm run build:xlsx && npm run build:web",
-    "lint:web": "npm --prefix web run lint"
+    "lint:web": "npm --prefix web run lint",
+    "smoke": "node scripts/smoke-check.mjs"
   },
   "author": "Danijel Jovanović",
   "license": "MIT"
